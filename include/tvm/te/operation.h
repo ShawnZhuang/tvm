@@ -208,6 +208,8 @@ class TVM_DLL BaseComputeOpNode : public OperationNode {
   Array<IterVar> reduce_axis;
   // override functions
   Array<IterVar> root_iter_vars() const final;
+  // output tensor dim
+  virtual Array<IterVar> output_iter_vars(size_t i) const=0;
   Array<PrimExpr> output_shape(size_t idx) const final;
   void GatherBound(const Operation& self, const std::unordered_map<Tensor, TensorDom>& tensor_dom,
                    std::unordered_map<IterVar, Range>* out_dom_map) const final;
@@ -231,6 +233,8 @@ class TVM_DLL ComputeOpNode : public BaseComputeOpNode {
   // override functions
   int num_outputs() const final;
   DataType output_dtype(size_t i) const final;
+  Array<IterVar> output_iter_vars(size_t i) const;
+  Array<PrimExpr> output_args(size_t i) const;
   Array<Tensor> InputTensors() const final;
   Operation ReplaceInputs(const Operation& self,
                           const std::unordered_map<Tensor, Tensor>& rmap) const final;
@@ -251,8 +255,53 @@ class TVM_DLL ComputeOpNode : public BaseComputeOpNode {
   }
 
   static constexpr const char* _type_key = "ComputeOp";
-  TVM_DECLARE_FINAL_OBJECT_INFO(ComputeOpNode, BaseComputeOpNode);
+  // TVM_DECLARE_FINAL_OBJECT_INFO(ComputeOpNode, BaseComputeOpNode);
+  TVM_DECLARE_BASE_OBJECT_INFO(ComputeOpNode, BaseComputeOpNode);
 };
+
+
+/*!
+ * \brief A Axis based Compute op that compute a tensor on certain domain.
+ */
+class TVM_DLL AxisComputeOpNode : public ComputeOpNode {
+ public:
+  /*! \brief the compute expression */
+  Array<IterVar> out_axis;
+  Array<PrimExpr> out_args;
+  /*! \brief constructor */
+  AxisComputeOpNode() {}
+  // override functions
+  Array<IterVar> output_iter_vars(size_t i) const final;
+  Array<PrimExpr> output_args(size_t i) const;
+  void VisitAttrs(AttrVisitor* v) {
+    v->Visit("name", &name);
+    v->Visit("tag", &tag);
+    v->Visit("attrs", &attrs);
+    v->Visit("axis", &axis);
+    v->Visit("reduce_axis", &reduce_axis);
+    v->Visit("out_args", &out_args);
+    v->Visit("out_axis", &out_axis);
+    v->Visit("body", &body);
+  }
+
+  static constexpr const char* _type_key = "AxisComputeOp";
+  TVM_DECLARE_FINAL_OBJECT_INFO(AxisComputeOpNode, ComputeOpNode);
+};
+
+/*!
+ * \brief Managed reference to ComputeOpNode
+ * \sa ComputeOpNode
+ */
+class AxisComputeOp : public Operation {
+ public:
+  TVM_DLL AxisComputeOp(std::string name, std::string tag, Map<String, ObjectRef> attrs,
+                    Array<IterVar> axis, Array<PrimExpr> out_args, Array<PrimExpr> body);
+
+  TVM_DEFINE_OBJECT_REF_METHODS(AxisComputeOp, Operation, AxisComputeOpNode);
+};
+
+
+
 
 /*!
  * \brief Managed reference to ComputeOpNode
@@ -286,6 +335,7 @@ class TensorComputeOpNode : public BaseComputeOpNode {
   // override functions
   int num_outputs() const final;
   DataType output_dtype(size_t i) const final;
+  Array<IterVar> output_iter_vars(size_t i) const final;
   Array<Tensor> InputTensors() const final;
   Operation ReplaceInputs(const Operation& self,
                           const std::unordered_map<Tensor, Tensor>& rmap) const final;

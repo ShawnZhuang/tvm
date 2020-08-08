@@ -256,5 +256,8 @@ Stmt TensorComputeOpNode::BuildProvide(const Stage& stage,
     }
   }
 }
+Array<IterVar> TensorComputeOpNode::output_iter_vars(size_t i) const{
+  return this->axis;
+}
 }  // namespace te
 }  // namespace tvm

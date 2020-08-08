@@ -95,6 +95,17 @@ void InferRootBound(const Stage& stage, const GraphContext& ctx,
     // verify correctness.
     CHECK_EQ(stage.GetAttachSpec()->attach_type, kGroupRoot) << "Output must be attached at root";
   }
+  if (stage->is_output && stage->op.as<AxisComputeOpNode>()) {
+    const AxisComputeOpNode* axis_op = stage->op.as<AxisComputeOpNode>();
+    if (axis_op != nullptr) {
+      for (int i = 0; i < axis_op->num_outputs(); ++i) {
+        for (auto dim_var : axis_op->output_iter_vars(i)) {
+          (*rmap)[dim_var] = dim_var->dom;
+        }
+      }
+    }
+  }
+
   if (stage->is_output || stage->op.as<PlaceholderOpNode>()) {
     for (auto iv : stage->op->root_iter_vars()) {
       CHECK(iv->dom.defined());

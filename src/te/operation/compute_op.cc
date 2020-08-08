@@ -79,7 +79,7 @@ Array<PrimExpr> BaseComputeOpNode::output_shape(size_t idx) const {
   CHECK_LT(idx, num_outputs());
   // for now, all outputs of a BaseComputeOp have the same shape
   Array<PrimExpr> shape;
-  for (const auto& ivar : this->axis) {
+  for (const auto& ivar : this->output_iter_vars(idx)) {
     const Range& r = ivar->dom;
     shape.push_back(r->extent);
   }
@@ -243,11 +243,13 @@ void BaseComputeOpNode::GatherBound(const Operation& self,
                                     const std::unordered_map<Tensor, TensorDom>& tensor_dom,
                                     std::unordered_map<IterVar, Range>* out_dom_map) const {
   CHECK_EQ(self.operator->(), this);
+
+  Array<IterVar> dim_axis = this->output_iter_vars(0);
   const TensorDom& tdom = tensor_dom.at(self.output(0));
-  for (size_t i = 0; i < this->axis.size(); ++i) {
-    Range r = arith::Union(tdom.data.at(i)).CoverRange(this->axis[i]->dom);
-    CHECK(!out_dom_map->count(this->axis[i]));
-    (*out_dom_map)[this->axis[i]] = r;
+  for (size_t i = 0; i < dim_axis.size(); ++i) {
+    Range r = arith::Union(tdom.data.at(i)).CoverRange(dim_axis[i]->dom);
+    CHECK(!out_dom_map->count(dim_axis[i]));
+    (*out_dom_map)[dim_axis[i]] = r;
   }
   for (size_t i = 0; i < this->reduce_axis.size(); ++i) {
     CHECK(!out_dom_map->count(this->reduce_axis[i]));
@@ -259,13 +261,14 @@ Stmt BaseComputeOpNode::BuildRealize(const Stage& stage,
                                      const std::unordered_map<IterVar, Range>& realize_map,
                                      const Stmt& body) const {
   CHECK_EQ(stage->op.get(), this);
-  Region bounds;
-  for (IterVar iv : this->axis) {
-    bounds.push_back(realize_map.at(iv));
-  }
   Stmt realize = body;
   for (int i = this->num_outputs(); i > 0; --i) {
     Tensor t = stage->op.output(i - 1);
+    Region bounds;
+    Array<IterVar> dim_axis = this->output_iter_vars(t->value_index);
+    for (IterVar iv : dim_axis) {
+      bounds.push_back(realize_map.at(iv));
+    }
     realize = tir::ProducerRealize(t, bounds, const_true(), realize);
     // alignment requirement, only useful for compute
     for (size_t i = 0; i < num_schedulable_dims(); ++i) {
@@ -321,11 +324,7 @@ void MakeReduction(const ComputeOpNode* op, const Array<Tensor>& tensors, Stmt* 
 
 // Normal computation.
 Stmt MakeProvide(const ComputeOpNode* op, const Tensor& t) {
-  Array<PrimExpr> args;
-  for (IterVar iv : op->axis) {
-    args.push_back(iv->var);
-  }
-  return ProducerStore(t, op->body[t->value_index], args);
+  return ProducerStore(t, op->body[t->value_index], op->output_args(t->value_index));
 }
 
 Stmt MakeComputeStmt(const ComputeOpNode* self, const Stage& stage,
@@ -589,6 +588,16 @@ Stmt TransformUpdate(const Stage& stage, const std::unordered_map<IterVar, Range
 
   auto cond = foldl([](PrimExpr a, PrimExpr b) { return a || b; }, const_false(1), conds);
   return IfThenElse(cond, update, body);
+}
+
+Array<IterVar> ComputeOpNode::output_iter_vars(size_t i) const { return this->axis; }
+
+Array<PrimExpr> ComputeOpNode::output_args(size_t i) const {
+  Array<PrimExpr> args;
+  for (IterVar iv : this->axis) {
+    args.push_back(iv->var);
+  }
+  return args;
 }
 
 }  // namespace te

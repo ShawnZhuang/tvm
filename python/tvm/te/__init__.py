@@ -31,9 +31,9 @@ from .schedule import Schedule, Stage, create_schedule, SpecializedCondition
 from .tensor import TensorSlice, Tensor
 from .tensor_intrin import decl_tensor_intrin
 from .tag import tag_scope
-from .operation import placeholder, compute, scan, extern, var, size_var
+from .operation import placeholder, compute, axis_compute, scan, extern, var, size_var
 from .operation import thread_axis, reduce_axis
 
-from .tensor import PlaceholderOp, ComputeOp, TensorComputeOp, ScanOp, ExternOp, HybridOp
+from .tensor import PlaceholderOp, ComputeOp, AxisComputeOp, TensorComputeOp, ScanOp, ExternOp, HybridOp
 from .autodiff import gradient
 from . import hybrid

@@ -55,6 +55,54 @@ def placeholder(shape, dtype=None, name="placeholder"):
         shape, dtype, name)
 
 
+def axis_compute(axis, fargs, fcompute, name="compute", tag="", attrs=None):
+    """Construct a new tensor by computing over the axis.
+
+    The compute rule is result[axis] = fcompute(axis)
+
+    Parameters
+    ----------
+    axis: Tuple of Itervar
+        The loop axis of the operation
+
+    fargs: lambda function of indices-> value
+        Specifies the output tensor args
+
+    fcompute: lambda function of indices-> value
+        Specifies the input source expression
+
+    name: str, optional
+        The name hint of the tensor
+
+    tag: str, optional
+        Additional tag information about the compute.
+
+    attrs: dict, optional
+        The additional auxiliary attributes about the compute.
+
+    Returns
+    -------
+    tensor: Tensor
+        The created tensor
+    """
+    axis = (axis,) if isinstance(axis, tvm.tir.PrimExpr) else axis
+    dim_var = [i.var for i in axis]
+    out_args = fargs(*dim_var)
+    body = fcompute(*dim_var)
+    print(out_args, body)
+    if not isinstance(body, (list, tuple)):
+        body = [body]
+    if not isinstance(out_args, (list, tuple)):
+        out_args = [out_args]
+
+    print(axis)
+    print(out_args, body)
+    op_node = _ffi_api.AxisComputeOp(name, tag, attrs, axis, out_args, body)
+    num = op_node.num_outputs
+    outputs = tuple(op_node.output(i) for i in range(num))
+    return outputs[0] if num == 1 else outputs
+
+
 def compute(shape, fcompute, name="compute", tag="", attrs=None):
     """Construct a new tensor by computing over the shape domain.
 
@@ -102,7 +150,8 @@ def compute(shape, fcompute, name="compute", tag="", attrs=None):
     if out_ndim != len(arg_names):
         raise ValueError("fcompute do not match dimension, ndim=%d" % ndim)
 
-    dim_var = [tvm.tir.IterVar((0, s), x, 0) for x, s in zip(arg_names, shape[:out_ndim])]
+    dim_var = [tvm.tir.IterVar((0, s), x, 0)
+               for x, s in zip(arg_names, shape[:out_ndim])]
     body = fcompute(*[v.var for v in dim_var])
 
     if isinstance(body, _tensor.TensorIntrinCall):
@@ -190,8 +239,10 @@ def scan(init, update, state_placeholder, inputs=None, name="scan", tag="", attr
     if inputs is None:
         inputs = []
     if len(init) != len(update) or len(init) != len(state_placeholder):
-        raise ValueError("init, update, state_placeholder must have same length")
-    axis = tvm.tir.IterVar((init[0].shape[0], update[0].shape[0]), "%s.idx" % name, 3)
+        raise ValueError(
+            "init, update, state_placeholder must have same length")
+    axis = tvm.tir.IterVar(
+        (init[0].shape[0], update[0].shape[0]), "%s.idx" % name, 3)
     op = _ffi_api.ScanOp(name, tag, attrs,
                          axis, init, update,
                          state_placeholder, inputs)
@@ -275,16 +326,19 @@ def extern(shape,
         if tag != "":
             raise ValueError("nested tag is not allowed for now")
         tag = _tag.TagScope.get_current().tag
-    shape = (shape,) if isinstance(shape, (tvm.tir.PrimExpr, _Integral)) else shape
+    shape = (shape,) if isinstance(
+        shape, (tvm.tir.PrimExpr, _Integral)) else shape
     if shape == () or isinstance(shape[0], (tvm.tir.PrimExpr, _Integral)):
         shape = [shape]
     if in_buffers is not None:
-        in_buffers = [in_buffers] if not isinstance(in_buffers, list) else in_buffers
+        in_buffers = [in_buffers] if not isinstance(
+            in_buffers, list) else in_buffers
         if len(inputs) != len(in_buffers):
             raise RuntimeError("Number of inputs and in_buffers mismatch: %d vs %d."
                                % (len(inputs), len(in_buffers)))
     if out_buffers is not None:
-        out_buffers = [out_buffers] if not isinstance(out_buffers, list) else out_buffers
+        out_buffers = [out_buffers] if not isinstance(
+            out_buffers, list) else out_buffers
         if len(shape) != len(out_buffers):
             raise RuntimeError("Number of outputs and out_buffers mismatch: %d vs %d."
                                % (len(shape), len(out_buffers)))
@@ -301,7 +355,8 @@ def extern(shape,
 
     if dtype is None:
         if len(types) != 1:
-            raise ValueError("Cannot infer output type, please provide dtype argument")
+            raise ValueError(
+                "Cannot infer output type, please provide dtype argument")
         infered_type = types.pop()
         dtype = [infered_type for _ in shape]
     if isinstance(dtype, str):
@@ -314,7 +369,8 @@ def extern(shape,
     if isinstance(body, tvm.tir.PrimExpr):
         body = tvm.tir.Evaluate(body)
     if not isinstance(body, tvm.tir.Stmt):
-        raise ValueError("Function '{}' should return PrimExpr or Stmt".format(fcompute.__name__))
+        raise ValueError(
+            "Function '{}' should return PrimExpr or Stmt".format(fcompute.__name__))
 
     op = _ffi_api.ExternOp(name, tag, attrs,
                            inputs, input_placeholders,

@@ -23,6 +23,7 @@ from tvm.tir import expr as _expr, DataProducer
 
 from . import _ffi_api
 
+
 class TensorSlice(ObjectGeneric, _expr.ExprOp):
     """Auxiliary data structure for enable slicing syntax from tensor."""
 
@@ -45,6 +46,7 @@ class TensorSlice(ObjectGeneric, _expr.ExprOp):
     def dtype(self):
         """Data content of the tensor."""
         return self.tensor.dtype
+
 
 @tvm._ffi.register_object
 class TensorIntrinCall(Object):
@@ -70,7 +72,6 @@ class Tensor(DataProducer, _expr.ExprOp):
                 raise ValueError("The indices must be expression")
 
         return _expr.ProducerLoad(self, args)
-
 
     def __getitem__(self, indices):
         return TensorSlice(self, indices)
@@ -173,6 +174,11 @@ class BaseComputeOp(Operation):
 @tvm._ffi.register_object
 class ComputeOp(BaseComputeOp):
     """Scalar operation."""
+
+
+@tvm._ffi.register_object
+class AxisComputeOp(ComputeOp):
+    """axis based Scalar operation."""
 
 
 @tvm._ffi.register_object
