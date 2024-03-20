@@ -32,6 +32,10 @@ def pretty_print(obj: Object) -> None:
     """Pretty print the object."""
     return _ffi_api.PrettyPrint(obj)  # type: ignore # pylint: disable=no-member
 
+def onnx_print(obj: Object, path_to_onnx) -> None:
+    """Pretty print the object."""
+    return _ffi_api.OnnxPrint(obj,path_to_onnx)  # type: ignore # pylint: disable=no-member
+
 
 def astext(obj: Object, show_meta_data=True, annotate=None):
     """Get the text format of the expression.
